@@ -1,5 +1,6 @@
 #include <tag.h>
 #include "gmdefs.h"
+#include "gmutils.h"
 #include "GMTaskManager.h"
 #include "GMTrack.h"
 #include "GMPreferences.h"

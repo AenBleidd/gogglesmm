@@ -18,6 +18,7 @@
 ********************************************************************************/
 #include "icons.h"
 #include "gmdefs.h"
+#include "gmutils.h"
 #include <FXPNGIcon.h>
 #include <FXPNGImage.h>
 #include "GMTrack.h"

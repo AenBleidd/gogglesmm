@@ -33,6 +33,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/fcntl.h>
+#include <xincs.h>
 
 
 
@@ -862,8 +863,208 @@ parsefield:
   return true;
   }
 
+GMHotkeys::GMHotkeys() {
+  gm_keystrings = 0;
+  gm_keystrings_count = 0;
+  
+  memset(&last_hotkey, 0, sizeof(HOTKEY));
+  memset(&global_play, 0, sizeof(HOTKEY));
+  memset(&local_play, 0, sizeof(HOTKEY));
+  memset(&global_playpause, 0, sizeof(HOTKEY));
+  memset(&local_playpause, 0, sizeof(HOTKEY));
+  memset(&global_pause, 0, sizeof(HOTKEY));
+  memset(&local_pause, 0, sizeof(HOTKEY));
+  memset(&global_stop, 0, sizeof(HOTKEY));
+  memset(&local_stop, 0, sizeof(HOTKEY));
+  memset(&global_prev, 0, sizeof(HOTKEY));
+  memset(&local_prev, 0, sizeof(HOTKEY));
+  memset(&global_next, 0, sizeof(HOTKEY));
+  memset(&local_next, 0, sizeof(HOTKEY));
+  }
 
+void GMHotkeys::free() {
+  gm_free_keystrings();
+  }
 
+void GMHotkeys::init() {
+  gm_prepare_keystrings();
+ }
 
+/*
+  Derived from parts of the xmodmap written by Jim Fulton, MIT X Consortium
+*/
+extern bool GMHotkeys::gm_prepare_keystrings(void){
+  if (gm_keystrings != 0)
+    return true;
+  Display * display = (Display*) GMApp::instance()->getDisplay();
+  int keycodeMin, keycodeMax, keycodeCount;
+  XDisplayKeycodes(display, &keycodeMin, &keycodeMax);
+  gm_keystrings_count = keycodeMax - keycodeMin + 1;
+  KeySym *origkeymap = XGetKeyboardMapping(display, keycodeMin, gm_keystrings_count, &keycodeCount);
+  if (!origkeymap)
+    return false;
+  KeySym *keymap = origkeymap;
+  gm_keystrings = new GM_KEYSTRINGS[gm_keystrings_count];
+  for (int i = keycodeMin, k = 0; i <= keycodeMax; i++, k++) {
+    gm_keystrings[k].keycode = i;
+    int j, max;
+    max = keycodeCount - 1;
+    while ((max>=0) && (keymap[max] == NoSymbol))
+      max--;
+    for (j = 0; j <= max; j++) {
+      KeySym ks = keymap[j];
+      if (ks != NoSymbol) {
+        gm_keystrings[k].str = XKeysymToString(ks);
+        break;
+        }
+      }
+    if (gm_keystrings[k].str.length() == 0)
+      gm_keystrings[k].str = "UNKNOWN";
+    keymap += keycodeCount;
+    }
+  XFree ((char *) origkeymap);
+  return true;
+  }
 
+extern void GMHotkeys::gm_free_keystrings(void){
+  if (gm_keystrings != 0) {
+    delete [] gm_keystrings;
+    gm_keystrings_count = 0;
+    gm_keystrings = 0;
+    }
+  return;
+  }
 
+extern FXString GMHotkeys::gm_convert_hotkeycode_to_string(int state, int code){
+  last_hotkey.modifier = state;
+  last_hotkey.keycode = code;
+  if (!gm_prepare_keystrings())
+    return FXString::null;
+// parse pressed keys
+  FXString str;
+  str.clear();
+  if (state&SHIFTMASK) {
+    if (str.length() == 0)
+      str = "Shift";
+    else
+     str = FXString::value("Shift + %s", str.text());
+    }
+  if (state&ALTMASK) {
+    if (str.length() == 0)
+      str = "Alt";
+    else
+     str = FXString::value("Alt + %s", str.text());
+    }
+  if (state&CONTROLMASK) {
+    if (str.length() == 0)
+      str = "Ctrl";
+    else
+     str = FXString::value("Ctrl + %s", str.text());
+    }
+  FXString sym;
+  for (int i = 0; i < gm_keystrings_count; i++) {
+    if (gm_keystrings[i].keycode == code) {
+      sym = gm_keystrings[i].str;
+      break;
+      }
+    }  
+  if (str.length() == 0)
+    str = FXString::value("%s", sym.text());
+  else if (sym.length() == 0)
+    str = FXString::value("%s", str.text());
+  else
+    str = FXString::value("%s + %s", str.text(), sym.text());
+  return str;
+  }
+
+extern FXString GMHotkeys::gm_convert_hotkeyevent_to_string(const FXEvent* event){
+  Display * display = (Display*) GMApp::instance()->getDisplay();
+  if (event->code != KEY_Shift_L && event->code != KEY_Shift_R && 
+      event->code != KEY_Control_L && event->code != KEY_Control_R &&
+      event->code != KEY_Alt_L && event->code != KEY_Alt_R)
+    return gm_convert_hotkeycode_to_string(event->state, XKeysymToKeycode(display, event->code));
+  else
+    return gm_convert_hotkeycode_to_string(event->state, 0);
+  }
+
+void GMHotkeys::save() {
+
+  GMApp::instance()->reg().writeIntEntry(HOTKEY_REG_SECTION, "global_playpause_keycode", global_playpause.keycode);
+  GMApp::instance()->reg().writeIntEntry(HOTKEY_REG_SECTION, "global_playpause_modifier", global_playpause.modifier);
+
+  GMApp::instance()->reg().writeIntEntry(HOTKEY_REG_SECTION, "local_playpause_keycode", local_playpause.keycode);
+  GMApp::instance()->reg().writeIntEntry(HOTKEY_REG_SECTION, "local_playpause_modifier", local_playpause.modifier);
+
+  GMApp::instance()->reg().writeIntEntry(HOTKEY_REG_SECTION, "global_play_keycode", global_play.keycode);
+  GMApp::instance()->reg().writeIntEntry(HOTKEY_REG_SECTION, "global_play_modifier", global_play.modifier);
+
+  GMApp::instance()->reg().writeIntEntry(HOTKEY_REG_SECTION, "local_play_keycode", local_play.keycode);
+  GMApp::instance()->reg().writeIntEntry(HOTKEY_REG_SECTION, "local_play_modifier", local_play.modifier);
+
+  GMApp::instance()->reg().writeIntEntry(HOTKEY_REG_SECTION, "global_pause_keycode", global_pause.keycode);
+  GMApp::instance()->reg().writeIntEntry(HOTKEY_REG_SECTION, "global_pause_modifier", global_pause.modifier);
+
+  GMApp::instance()->reg().writeIntEntry(HOTKEY_REG_SECTION, "local_pause_keycode", local_pause.keycode);
+  GMApp::instance()->reg().writeIntEntry(HOTKEY_REG_SECTION, "local_pause_modifier", local_pause.modifier);
+
+  GMApp::instance()->reg().writeIntEntry(HOTKEY_REG_SECTION, "global_stop_keycode", global_stop.keycode);
+  GMApp::instance()->reg().writeIntEntry(HOTKEY_REG_SECTION, "global_stop_modifier", global_stop.modifier);
+
+  GMApp::instance()->reg().writeIntEntry(HOTKEY_REG_SECTION, "local_stop_keycode", local_stop.keycode);
+  GMApp::instance()->reg().writeIntEntry(HOTKEY_REG_SECTION, "local_stop_modifier", local_stop.modifier);
+
+  GMApp::instance()->reg().writeIntEntry(HOTKEY_REG_SECTION, "global_prev_keycode", global_prev.keycode);
+  GMApp::instance()->reg().writeIntEntry(HOTKEY_REG_SECTION, "global_prev_modifier", global_prev.modifier);
+
+  GMApp::instance()->reg().writeIntEntry(HOTKEY_REG_SECTION, "local_prev_keycode", local_prev.keycode);
+  GMApp::instance()->reg().writeIntEntry(HOTKEY_REG_SECTION, "local_prev_modifier", local_prev.modifier);
+
+  GMApp::instance()->reg().writeIntEntry(HOTKEY_REG_SECTION, "global_next_keycode", global_next.keycode);
+  GMApp::instance()->reg().writeIntEntry(HOTKEY_REG_SECTION, "global_next_modifier", global_next.modifier);
+
+  GMApp::instance()->reg().writeIntEntry(HOTKEY_REG_SECTION, "local_next_keycode", local_next.keycode);
+  GMApp::instance()->reg().writeIntEntry(HOTKEY_REG_SECTION, "local_next_modifier", local_next.modifier);
+
+  return;
+}
+
+void GMHotkeys::load() {
+
+  global_playpause.keycode = GMApp::instance()->reg().readIntEntry(HOTKEY_REG_SECTION, "global_playpause_keycode", 0);
+  global_playpause.modifier = GMApp::instance()->reg().readIntEntry(HOTKEY_REG_SECTION, "global_playpause_modifier", 0);
+
+  local_playpause.keycode = GMApp::instance()->reg().readIntEntry(HOTKEY_REG_SECTION, "local_playpause_keycode", 0);
+  local_playpause.modifier = GMApp::instance()->reg().readIntEntry(HOTKEY_REG_SECTION, "local_playpause_modifier", 0);
+
+  global_play.keycode = GMApp::instance()->reg().readIntEntry(HOTKEY_REG_SECTION, "global_play_keycode", 0);
+  global_play.modifier = GMApp::instance()->reg().readIntEntry(HOTKEY_REG_SECTION, "global_play_modifier", 0);
+
+  local_play.keycode = GMApp::instance()->reg().readIntEntry(HOTKEY_REG_SECTION, "local_play_keycode", 0);
+  local_play.modifier = GMApp::instance()->reg().readIntEntry(HOTKEY_REG_SECTION, "local_play_modifier", 0);
+
+  global_pause.keycode = GMApp::instance()->reg().readIntEntry(HOTKEY_REG_SECTION, "global_pause_keycode", 0);
+  global_pause.modifier = GMApp::instance()->reg().readIntEntry(HOTKEY_REG_SECTION, "global_pause_modifier", 0);
+
+  local_pause.keycode = GMApp::instance()->reg().readIntEntry(HOTKEY_REG_SECTION, "local_pause_keycode", 0);
+  local_pause.modifier = GMApp::instance()->reg().readIntEntry(HOTKEY_REG_SECTION, "local_pause_modifier", 0);
+
+  global_stop.keycode = GMApp::instance()->reg().readIntEntry(HOTKEY_REG_SECTION, "global_stop_keycode", 0);
+  global_stop.modifier = GMApp::instance()->reg().readIntEntry(HOTKEY_REG_SECTION, "global_stop_modifier", 0);
+
+  local_stop.keycode = GMApp::instance()->reg().readIntEntry(HOTKEY_REG_SECTION, "local_stop_keycode", 0);
+  local_stop.modifier = GMApp::instance()->reg().readIntEntry(HOTKEY_REG_SECTION, "local_stop_modifier", 0);
+
+  global_prev.keycode = GMApp::instance()->reg().readIntEntry(HOTKEY_REG_SECTION, "global_prev_keycode", 0);
+  global_prev.modifier = GMApp::instance()->reg().readIntEntry(HOTKEY_REG_SECTION, "global_prev_modifier", 0);
+
+  local_prev.keycode = GMApp::instance()->reg().readIntEntry(HOTKEY_REG_SECTION, "local_prev_keycode", 0);
+  local_prev.modifier = GMApp::instance()->reg().readIntEntry(HOTKEY_REG_SECTION, "local_prev_modifier", 0);
+
+  global_next.keycode = GMApp::instance()->reg().readIntEntry(HOTKEY_REG_SECTION, "global_next_keycode", 0);
+  global_next.modifier = GMApp::instance()->reg().readIntEntry(HOTKEY_REG_SECTION, "global_next_modifier", 0);
+
+  local_next.keycode = GMApp::instance()->reg().readIntEntry(HOTKEY_REG_SECTION, "local_next_keycode", 0);
+  local_next.modifier = GMApp::instance()->reg().readIntEntry(HOTKEY_REG_SECTION, "local_next_modifier", 0);
+
+  return;
+}

@@ -17,6 +17,7 @@
 * along with this program.  If not, see http://www.gnu.org/licenses.           *
 ********************************************************************************/
 #include "gmdefs.h"
+#include "gmutils.h"
 #include "GMTrack.h"
 #include "GMFilename.h"
 #include "GMPreferences.h"
@@ -187,6 +188,12 @@ GMPreferences::GMPreferences() :
   dbus_mpris2(true){
   resetColors();
 
+  hotkeys = new GMHotkeys();
+
+  }
+
+GMPreferences::~GMPreferences() {
+  delete hotkeys;
   }
 
 void GMPreferences::save(FXSettings & reg) const {
@@ -250,6 +257,9 @@ void GMPreferences::save(FXSettings & reg) const {
   reg.writeBoolEntry(section_dbus,key_dbus_notify_daemon,dbus_notify_daemon);
   reg.writeBoolEntry(section_dbus,key_dbus_mpris1,dbus_mpris1);
   reg.writeBoolEntry(section_dbus,key_dbus_mpris2,dbus_mpris2);
+
+  /// Hotkeys
+  hotkeys->save();
 
   }
 

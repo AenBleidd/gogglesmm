@@ -88,6 +88,7 @@ public:
   FXint dpi;
   ColorTheme current;
   ColorTheme selected;
+  GMHotkeyTable * hotkeys_table;
 public:
   enum {
     ID_LASTFM_USERNAME= FXDialogBox::ID_LAST,
@@ -123,7 +124,8 @@ public:
     ID_TITLE_FORMAT,
     ID_TITLE_FORMAT_LABEL,
     ID_DISPLAY_DPI,
-    ID_APPLY_AUDIO
+    ID_APPLY_AUDIO,
+    ID_HOTKEYS_TABLE,
     };
 public:
   long onCmdLastFMScrobble(FXObject*,FXSelector,void*);

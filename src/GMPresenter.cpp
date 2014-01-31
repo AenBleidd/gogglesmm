@@ -17,6 +17,7 @@
 * along with this program.  If not, see http://www.gnu.org/licenses.           *
 ********************************************************************************/
 #include "gmdefs.h"
+#include "gmutils.h"
 #ifdef HAVE_OPENGL
 #include <FXPNGIcon.h>
 #include <FXPNGImage.h>

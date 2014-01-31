@@ -18,6 +18,7 @@
 ********************************************************************************/
 #include <limits.h>
 #include "gmdefs.h"
+#include "gmutils.h"
 #include <FXPNGIcon.h>
 #include "GMTrack.h"
 #include "GMTrackList.h"

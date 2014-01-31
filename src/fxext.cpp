@@ -16,8 +16,13 @@
 * You should have received a copy of the GNU General Public License            *
 * along with this program.  If not, see http://www.gnu.org/licenses.           *
 ********************************************************************************/
+#include <xincs.h>
+#include <fxkeys.h>
+
 #include "gmdefs.h"
 #include "fxext.h"
+#include "GMApp.h"
+#include "gmutils.h"
 
 // Map
 FXDEFMAP(GMThreadDialog) GMThreadDialogMap[]={
@@ -287,7 +292,7 @@ long GMHeader::onPaint(FXObject*,FXSelector,void* ptr){
 
   // Paint background
 
-  fillVerticalGradient(dc,ev->rect.x,0,ev->rect.w,height-1,gm_make_hilite_color(backColor),gm_make_hilite_color(gm_make_shadow_color(backColor)));
+//  fillVerticalGradient(dc,ev->rect.x,0,ev->rect.w,height-1,gm_make_hilite_color(backColor),gm_make_hilite_color(gm_make_shadow_color(backColor)));
   dc.setForeground(shadowColor);
   dc.fillRectangle(ev->rect.x,height-1,ev->rect.w,1);
 
@@ -307,6 +312,7 @@ long GMHeader::onPaint(FXObject*,FXSelector,void* ptr){
         y=pos+items[0]->getPos();
         }
       if(0<y){
+        fillVerticalGradient(dc,0,0,width,y,gm_make_hilite_color(backColor),gm_make_hilite_color(gm_make_shadow_color(backColor)));
         if(options&FRAME_THICK)
           drawDoubleRaisedRectangle(dc,0,0,width,y);
         else if(options&FRAME_RAISED)
@@ -322,6 +328,7 @@ long GMHeader::onPaint(FXObject*,FXSelector,void* ptr){
         y=pos+items[items.no()-1]->getPos()+items[items.no()-1]->getSize();
         }
       if(y<height){
+        fillVerticalGradient(dc,0,y,width,height-y,gm_make_hilite_color(backColor),gm_make_hilite_color(gm_make_shadow_color(backColor)));
         if(options&FRAME_THICK)
           drawDoubleRaisedRectangle(dc,0,y,width,height-y);
         else if(options&FRAME_RAISED)
@@ -334,6 +341,7 @@ long GMHeader::onPaint(FXObject*,FXSelector,void* ptr){
     for(i=ilo; i<=ihi; i++){
       y=pos+items[i]->getPos();
       h=items[i]->getSize();
+      fillVerticalGradient(dc,0,y,width,h,gm_make_hilite_color(backColor),gm_make_hilite_color(gm_make_shadow_color(backColor)));
       if(items[i]->isPressed()){
         if(options&FRAME_THICK)
           drawDoubleSunkenRectangle(dc,0,y,width,h);
@@ -352,6 +360,8 @@ long GMHeader::onPaint(FXObject*,FXSelector,void* ptr){
 
   // Horizontal
   else{
+    // Paint background
+    fillVerticalGradient(dc,ev->rect.x,0,ev->rect.w,height-1,gm_make_hilite_color(backColor),gm_make_hilite_color(gm_make_shadow_color(backColor)));
 
     // Determine affected items
     ilo=getItemAt(ev->rect.x);
@@ -2233,5 +2243,438 @@ long GMTrackProgressBar::onLeftBtnRelease(FXObject*,FXSelector,void* ptr){
     return 1;
     }
   return 0;
+  }
+
+FXDEFMAP(GMHotKeyTextField) GMHotKeyTextFieldMap[]={
+  FXMAPFUNC(SEL_KEYPRESS,0,GMHotKeyTextField::onKeyPress),
+};
+
+FXIMPLEMENT(GMHotKeyTextField,GMTextField,GMHotKeyTextFieldMap,ARRAYNUMBER(GMHotKeyTextFieldMap));
+
+GMHotKeyTextField::GMHotKeyTextField(FXTable *t,FXComposite* p,FXint ncols,FXObject* tgt,FXSelector sel,FXuint opts,FXint x,FXint y,FXint w,FXint h,FXint pl,FXint pr,FXint pt,FXint pb): GMTextField(p,ncols,tgt,sel,opts,x,y,w,h,pl,pr,pt,pb){
+  table = (GMHotkeyTable*)t;
+  }
+long GMHotKeyTextField::onKeyPress(FXObject*,FXSelector,void* ptr){
+  if(isEnabled()){
+    FXEvent* event=(FXEvent*)ptr;
+    if (event->code == KEY_Escape && !(event->state&SHIFTMASK) && !(event->state&ALTMASK) &&!(event->state&CONTROLMASK)) {
+      table->cancelInput();
+      return 1;
+      }
+    if ((event->code == KEY_Delete || event->code == KEY_KP_Delete) && !(event->state&SHIFTMASK) && !(event->state&ALTMASK) &&!(event->state&CONTROLMASK)) {
+      setText(table->hotkeys->gm_convert_hotkeycode_to_string(0,0));
+      return 1;
+      }
+    if ((event->code == KEY_Return || event->code == KEY_KP_Enter) && !(event->state&SHIFTMASK) && !(event->state&ALTMASK) &&!(event->state&CONTROLMASK)) {
+      table->acceptInput();
+      return 1;
+      }
+    setText(table->hotkeys->gm_convert_hotkeyevent_to_string(event));
+    return 1;
+    }
+  return 0;
+  }
+
+FXIMPLEMENT(GMTableItem,FXTableItem,NULL,0);
+
+GMTableItem::GMTableItem(const FXString& text,FXIcon* ic,void* ptr) : FXTableItem(text,ic,ptr){
+  }
+
+FXIMPLEMENT(GMHotkeyTableItem,GMTableItem,NULL,0);
+
+GMHotkeyTableItem::GMHotkeyTableItem(const FXString& text,FXIcon* ic,void* ptr) : GMTableItem(text,ic,ptr){
+  }
+
+// Create input control for editing this item
+FXWindow* GMHotkeyTableItem::getControlFor(FXTable* table){
+  register GMHotkeyTextFieldWithButton *field;
+  register FXuint justify=0;
+  field=new GMHotkeyTextFieldWithButton(table,1,NULL,0,TEXTFIELD_ENTER_ONLY,0,0,0,0,table->getMarginLeft(),table->getMarginRight(),table->getMarginTop(),table->getMarginBottom());
+  if(state&LEFT) justify|=JUSTIFY_LEFT;
+  if(state&RIGHT) justify|=JUSTIFY_RIGHT;
+  if(state&TOP) justify|=JUSTIFY_TOP;
+  if(state&BOTTOM) justify|=JUSTIFY_BOTTOM;
+  field->create();
+  field->setJustify(justify);
+  field->setFont(table->getFont());
+  field->setBackColor(table->getBackColor());
+  field->setTextColor(table->getTextColor());
+  field->setSelBackColor(table->getSelBackColor());
+  field->setSelTextColor(table->getSelTextColor());
+  field->setText(label);
+  return field;
+  }
+
+void GMHotkeyTableItem::setFromControl(FXWindow* control){
+  register GMHotkeyTextFieldWithButton *field=static_cast<GMHotkeyTextFieldWithButton*>(control);
+  setText(field->getText());
+  }
+
+FXIMPLEMENT(GMTable,FXTable,NULL,0);
+
+GMTable::GMTable(){
+  }
+
+#define DEFAULTCOLWIDTH     100     // Initial value for defColWidth
+#define DEFAULTROWHEIGHT    20      // Initial value for defRowHeight
+
+GMTable::GMTable(FXComposite *p,FXObject* tgt,FXSelector sel,FXuint opts,FXint x,FXint y,FXint w,FXint h,FXint pl,FXint pr,FXint pt,FXint pb)
+  :FXTable(p,tgt,sel,opts,x,y,w,h,pl,pr,pt,pb){
+  FXuint colhs=HEADER_HORIZONTAL|HEADER_TRACKING|HEADER_BUTTON|FRAME_RAISED|FRAME_THICK|LAYOUT_FIX_HEIGHT;
+  FXuint rowhs=HEADER_VERTICAL|HEADER_TRACKING|HEADER_BUTTON|FRAME_RAISED|FRAME_THICK|LAYOUT_FIX_WIDTH;
+  if(options&TABLE_COL_SIZABLE) colhs|=HEADER_RESIZE;
+  if(options&TABLE_NO_COLSELECT) colhs&=~HEADER_BUTTON;
+  if(options&TABLE_ROW_SIZABLE) rowhs|=HEADER_RESIZE;
+  if(options&TABLE_NO_ROWSELECT) rowhs&=~HEADER_BUTTON;
+  delete colHeader;
+  delete rowHeader;
+  colHeader=new GMHeader(this,this,FXTable::ID_SELECT_COLUMN_INDEX,colhs,0,0,0,DEFAULTROWHEIGHT);
+  rowHeader=new GMHeader(this,this,FXTable::ID_SELECT_ROW_INDEX,rowhs,0,0,DEFAULTCOLWIDTH,0);
+  delete cornerButton;
+  cornerButton=new GMButton(this,FXString::null,NULL,this,FXTable::ID_SELECT_ALL,FRAME_RAISED|FRAME_THICK);
+  if(options&TABLE_NO_COLSELECT && options&TABLE_NO_ROWSELECT) cornerButton->setTarget(0);
+  delete vertical;
+  delete horizontal;
+  delete corner;
+  vertical=new GMScrollBar(this,this,GMScrollArea::ID_VSCROLLED,SCROLLBAR_VERTICAL);
+  horizontal=new GMScrollBar(this,this,GMScrollArea::ID_HSCROLLED,SCROLLBAR_HORIZONTAL);
+  corner=new GMScrollCorner(this);
+  }
+
+FXIMPLEMENT(GMHotkeyTable,GMTable,NULL,0)
+
+GMHotkeyTable::GMHotkeyTable(){
+  }
+
+GMHotkeyTable::GMHotkeyTable(GMHotkeys *htkks,FXComposite *p,FXObject* tgt,FXSelector sel,FXuint opts,FXint x,FXint y,FXint w,FXint h,FXint pl,FXint pr,FXint pt,FXint pb)
+  :GMTable(p,tgt,sel,opts,x,y,w,h,pl,pr,pt,pb){
+  hotkeys = htkks;
+  }
+
+// Create item
+FXTableItem* GMHotkeyTable::createItem(const FXString& text,FXIcon* icon,void* ptr){
+  return new GMHotkeyTableItem(text,icon,ptr);
+  }
+
+FXbool GMHotkeyTable::acceptInput(FXbool notify){
+  FXint col = input.fm.col;
+  FXint row = input.fm.row;
+  if (GMTable::acceptInput(notify)) {
+    switch(col) {
+      case 0: {
+        switch(row) {
+          case 0: {
+            hotkeys->global_play = hotkeys->last_hotkey;
+            break;
+            }
+          case 1: {
+            hotkeys->global_playpause = hotkeys->last_hotkey;
+            break;
+            }
+          case 2: {
+            hotkeys->global_pause = hotkeys->last_hotkey;
+            break;
+            }
+          case 3: {
+            hotkeys->global_stop = hotkeys->last_hotkey;
+            break;
+            }
+          case 4: {
+            hotkeys->global_prev = hotkeys->last_hotkey;
+            break;
+            }
+          case 5: {
+            hotkeys->global_next = hotkeys->last_hotkey;
+            break;
+            }
+          }
+        break;
+        }
+      case 1: {
+        switch(row) {
+          case 0: {
+            hotkeys->local_play = hotkeys->last_hotkey;
+            break;
+            }
+          case 1: {
+            hotkeys->local_playpause = hotkeys->last_hotkey;
+            break;
+            }
+          case 2: {
+            hotkeys->local_pause = hotkeys->last_hotkey;
+            break;
+            }
+          case 3: {
+            hotkeys->local_stop = hotkeys->last_hotkey;
+            break;
+            }
+          case 4: {
+            hotkeys->local_prev = hotkeys->last_hotkey;
+            break;
+            }
+          case 5: {
+            hotkeys->local_next = hotkeys->last_hotkey;
+            break;
+            }
+          }
+        break;
+        }
+      }
+    return true;
+    }
+  return false;
+  }
+
+FXDEFMAP(GMTextFieldWithButton) GMTextFieldWithButtonMap[]={
+  FXMAPFUNC(SEL_LEFTBUTTONPRESS,GMTextFieldWithButton::ID_CLEAR,GMTextFieldWithButton::onTextButton),
+  FXMAPFUNC(SEL_KEYPRESS,0,GMTextFieldWithButton::onKeyPress),
+  FXMAPFUNC(SEL_COMMAND,FXWindow::ID_SETVALUE,GMTextFieldWithButton::onFwdToText),
+  FXMAPFUNC(SEL_COMMAND,FXWindow::ID_SETINTVALUE,GMTextFieldWithButton::onFwdToText),
+  FXMAPFUNC(SEL_COMMAND,FXWindow::ID_SETREALVALUE,GMTextFieldWithButton::onFwdToText),
+  FXMAPFUNC(SEL_COMMAND,FXWindow::ID_SETSTRINGVALUE,GMTextFieldWithButton::onFwdToText),
+  FXMAPFUNC(SEL_COMMAND,FXWindow::ID_GETINTVALUE,GMTextFieldWithButton::onFwdToText),
+  FXMAPFUNC(SEL_COMMAND,FXWindow::ID_GETREALVALUE,GMTextFieldWithButton::onFwdToText),
+  FXMAPFUNC(SEL_COMMAND,FXWindow::ID_GETSTRINGVALUE,GMTextFieldWithButton::onFwdToText),
+};
+
+FXIMPLEMENT(GMTextFieldWithButton,FXPacker,GMTextFieldWithButtonMap,ARRAYNUMBER(GMTextFieldWithButtonMap))
+
+GMTextFieldWithButton::GMTextFieldWithButton(FXComposite *p,FXint cols,FXObject* tgt,FXSelector sel,FXuint opts,FXint x,FXint y,FXint w,FXint h,FXint pl,FXint pr,FXint pt,FXint pb):FXPacker(p,opts,x,y,w,h,pl,pr,pt,pb,0,0){
+  target=tgt;
+  message=sel;
+  field=new GMTextField(this,cols,this,GMTextFieldWithButton::ID_TEXT,opts,x,y,w,h,pl,pr,pt,pb);
+  if(!(flags&FLAG_ENABLED)) field->setEditable(false);
+  button=new GMButton(this,"X",NULL,this,GMTextFieldWithButton::ID_CLEAR,FRAME_RAISED|FRAME_THICK);
+  flags&=~FLAG_UPDATE;  // Never GUI update
+  }
+
+// Create window
+void GMTextFieldWithButton::create(){
+  FXPacker::create();
+  }
+
+// Detach window
+void GMTextFieldWithButton::detach(){
+  FXPacker::detach();
+  }
+
+// Destroy window
+void GMTextFieldWithButton::destroy(){
+  FXPacker::destroy();
+  }
+
+// Enable the window
+void GMTextFieldWithButton::enable(){
+  if(!isEnabled()){
+    FXPacker::enable();
+    field->enable();
+    button->enable();
+    }
+  }
+
+// Disable the window
+void GMTextFieldWithButton::disable(){
+  if(isEnabled()){
+    FXPacker::disable();
+    field->disable();
+    button->disable();
+    }
+  }
+
+// Get default width
+FXint GMTextFieldWithButton::getDefaultWidth(){
+  return field->getDefaultWidth()+button->getDefaultWidth()+(border<<1);
+  }
+
+// Get default height
+FXint GMTextFieldWithButton::getDefaultHeight(){
+  FXint th=field->getDefaultHeight();
+  FXint bh=button->getDefaultHeight();
+  return FXMAX(th,bh)+(border<<1);
+  }
+
+// Recalculate layout
+void GMTextFieldWithButton::layout(){
+  FXint buttonWidth,textWidth,itemHeight;
+  itemHeight=height-(border<<1);
+  buttonWidth=button->getDefaultWidth();
+  textWidth=width-buttonWidth-(border<<1);
+  field->position(border,border,textWidth,itemHeight);
+  button->position(border+textWidth,border,buttonWidth,itemHeight);
+  flags&=~FLAG_DIRTY;
+  }
+
+// Pressed clear button
+long GMTextFieldWithButton::onTextButton(FXObject*,FXSelector,void* ptr){
+  field->setText(FXString::null);
+  return target && target->tryHandle(this,FXSEL(SEL_LEFTBUTTONPRESS,message),ptr);
+  }
+
+// Key pressed in text field
+long GMTextFieldWithButton::onKeyPress(FXObject* sender,FXSelector sel,void* ptr){
+  return field->handle(sender,sel,ptr);
+  }
+
+// Command handled in the text field
+long GMTextFieldWithButton::onFwdToText(FXObject* sender,FXSelector sel,void* ptr){
+  return field->handle(sender,sel,ptr);
+  }
+
+// Return true if editable
+FXbool GMTextFieldWithButton::isEditable() const {
+  return field->isEditable();
+  }
+
+// Set widget is editable or not
+void GMTextFieldWithButton::setEditable(FXbool edit){
+  field->setEditable(edit);
+  if (edit)
+    button->enable();
+  else
+    button->disable();
+  }
+
+// Set text
+void GMTextFieldWithButton::setText(const FXString& text,FXbool notify){
+  if(field->getText()!=text){
+    field->setText(text);
+    if(notify && target){target->tryHandle(this,FXSEL(SEL_COMMAND,message),(void*)getText().text());}
+    }
+  }
+
+// Obtain text
+FXString GMTextFieldWithButton::getText() const {
+  return field->getText();
+  }
+
+// Set number of text columns
+void GMTextFieldWithButton::setNumColumns(FXint cols){
+  field->setNumColumns(cols);
+  }
+
+// Get number of text columns
+FXint GMTextFieldWithButton::getNumColumns() const {
+  return field->getNumColumns();
+  }
+
+// Set font
+void GMTextFieldWithButton::setFont(FXFont* fnt){
+  if(!fnt){ fxerror("%s::setFont: NULL font specified.\n",getClassName()); }
+  field->setFont(fnt);
+  recalc();
+  }
+
+// Obtain font
+FXFont* GMTextFieldWithButton::getFont() const {
+  return field->getFont();
+  }
+
+// Set text justify style
+void GMTextFieldWithButton::setJustify(FXuint style){
+  field->setJustify(style);
+  }
+
+// Get text justify style
+FXuint GMTextFieldWithButton::getJustify() const {
+  return field->getJustify();
+  }
+
+// Set window background color
+void GMTextFieldWithButton::setBackColor(FXColor clr){
+  field->setBackColor(clr);
+  }
+
+// Get background color
+FXColor GMTextFieldWithButton::getBackColor() const {
+  return field->getBackColor();
+  }
+
+// Set text color
+void GMTextFieldWithButton::setTextColor(FXColor clr){
+  field->setTextColor(clr);
+  }
+
+// Return text color
+FXColor GMTextFieldWithButton::getTextColor() const {
+  return field->getTextColor();
+  }
+
+// Set select background color
+void GMTextFieldWithButton::setSelBackColor(FXColor clr){
+  field->setSelBackColor(clr);
+  }
+
+// Return selected background color
+FXColor GMTextFieldWithButton::getSelBackColor() const {
+  return field->getSelBackColor();
+  }
+
+// Set selected text color
+void GMTextFieldWithButton::setSelTextColor(FXColor clr){
+  field->setSelTextColor(clr);
+  }
+
+// Return selected text color
+FXColor GMTextFieldWithButton::getSelTextColor() const {
+  return field->getSelTextColor();
+  }
+
+// Set help text
+void GMTextFieldWithButton::setHelpText(const FXString& txt){
+  field->setHelpText(txt);
+  }
+
+// Get help text
+const FXString& GMTextFieldWithButton::getHelpText() const {
+  return field->getHelpText();
+  }
+
+// Set tip text
+void GMTextFieldWithButton::setTipText(const FXString& txt){
+  field->setTipText(txt);
+  }
+
+// Get tip text
+const FXString& GMTextFieldWithButton::getTipText() const {
+  return field->getTipText();
+  }
+
+// Save object to stream
+void GMTextFieldWithButton::save(FXStream& store) const {
+  FXPacker::save(store);
+  store << field;
+  store << button;
+  }
+
+// Load object from stream
+void GMTextFieldWithButton::load(FXStream& store){
+  FXPacker::load(store);
+  store >> field;
+  store >> button;
+  }
+
+// Delete it
+GMTextFieldWithButton::~GMTextFieldWithButton(){
+  field=(GMTextField*)-1L;
+  button=(GMButton*)-1L;
+  }
+
+FXDEFMAP(GMHotkeyTextFieldWithButton) GMHotkeyTextFieldWithButtonMap[]={
+  FXMAPFUNC(SEL_LEFTBUTTONPRESS,GMTextFieldWithButton::ID_CLEAR,GMHotkeyTextFieldWithButton::onTextButton),
+};
+
+FXIMPLEMENT(GMHotkeyTextFieldWithButton,GMTextFieldWithButton,GMHotkeyTextFieldWithButtonMap,ARRAYNUMBER(GMHotkeyTextFieldWithButtonMap))
+
+GMHotkeyTextFieldWithButton::GMHotkeyTextFieldWithButton(FXComposite *p,FXint cols,FXObject* tgt,FXSelector sel,FXuint opts,FXint x,FXint y,FXint w,FXint h,FXint pl,FXint pr,FXint pt,FXint pb):GMTextFieldWithButton(p,cols,tgt,sel,opts,x,y,w,h,pl,pr,pt,pb){
+  delete field;
+  field=new GMHotKeyTextField((FXTable*)p,this,cols,this,GMTextFieldWithButton::ID_TEXT,opts,x,y,w,h,pl,pr,pt,pb);
+  if(!(flags&FLAG_ENABLED)) field->setEditable(false);
+  flags&=~FLAG_UPDATE;  // Never GUI update
+  table = (GMHotkeyTable*)p;
+  }
+
+long GMHotkeyTextFieldWithButton::onTextButton(FXObject*,FXSelector,void* ptr){
+  field->setText(table->hotkeys->gm_convert_hotkeycode_to_string(0,0));
+  return target && target->tryHandle(this,FXSEL(SEL_LEFTBUTTONPRESS,message),ptr);
   }
 

@@ -18,6 +18,7 @@
 ********************************************************************************/
 #include <tag.h>
 #include "gmdefs.h"
+#include "gmutils.h"
 #include <FXArray.h>
 #include <fxkeys.h>
 #include "icons.h"

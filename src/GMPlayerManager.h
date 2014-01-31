@@ -350,7 +350,7 @@ public:
 
   void register_global_hotkeys();
 
-  FXbool handle_global_hotkeys(FXuint code);
+  FXbool handle_global_hotkeys(FXuint code, FXuint modifier);
 
 
   void cmd_play();

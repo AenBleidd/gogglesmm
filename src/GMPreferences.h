@@ -160,10 +160,12 @@ public:
   FXbool dbus_mpris1;
   FXbool dbus_mpris2;
 #endif
+  GMHotkeys *hotkeys;
 public:
   /// Default Constructor
   GMPreferences();
   GMPreferences(const GMPreferences & p);
+  virtual ~GMPreferences();
 
   void parseCommandLine(int argc,char **argv);
 

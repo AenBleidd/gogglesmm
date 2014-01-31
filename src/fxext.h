@@ -494,6 +494,150 @@ public:
   GMTrackProgressBar(FXComposite* p,FXObject* target=NULL,FXSelector sel=0,FXuint opts=PROGRESSBAR_NORMAL,FXint x=0,FXint y=0,FXint w=0,FXint h=0,FXint pl=DEFAULT_PAD,FXint pr=DEFAULT_PAD,FXint pt=DEFAULT_PAD,FXint pb=DEFAULT_PAD);
   };
 
+class GMHotkeyTable; //previous declaration
 
+class GMHotKeyTextField : public GMTextField {
+  FXDECLARE(GMHotKeyTextField) 
+protected:
+  GMHotKeyTextField() : GMTextField(){} 
+private:
+  GMHotKeyTextField(const GMHotKeyTextField&);
+  GMHotKeyTextField &operator=(const GMHotKeyTextField&);
+  GMHotkeyTable *table;
+public:
+/// Construct text field wide enough to display ncols columns
+  GMHotKeyTextField(FXTable *t,FXComposite* p,FXint ncols,FXObject* tgt=NULL,FXSelector sel=0,FXuint opts=TEXTFIELD_NORMAL,FXint x=0,FXint y=0,FXint w=0,FXint h=0,FXint pl=DEFAULT_PAD,FXint pr=DEFAULT_PAD,FXint pt=DEFAULT_PAD,FXint pb=DEFAULT_PAD);
+
+  long onKeyPress(FXObject*,FXSelector,void*);
+  };
+
+class GMTableItem : public FXTableItem {
+  FXDECLARE(GMTableItem)
+protected:
+  GMTableItem() : FXTableItem(){} 
+private:
+  GMTableItem(const GMTableItem&);
+  GMTableItem &operator=(const GMTableItem&);
+public:
+  GMTableItem(const FXString& text,FXIcon* ic=NULL,void* ptr=NULL);
+  };
+
+class GMHotkeyTableItem : public GMTableItem {
+  FXDECLARE(GMHotkeyTableItem)
+protected:
+  GMHotkeyTableItem() : GMTableItem(){}
+private:
+  GMHotkeyTableItem(const GMHotkeyTableItem&);
+  GMHotkeyTableItem &operator=(const GMHotkeyTableItem&);
+public:
+  GMHotkeyTableItem(const FXString& text,FXIcon* ic=NULL,void* ptr=NULL);
+  virtual FXWindow* getControlFor(FXTable* table);
+  virtual void setFromControl(FXWindow* control);
+  };
+
+class GMTable : public FXTable {
+  FXDECLARE(GMTable)
+protected:
+  GMTable();
+private:
+  GMTable(const GMTable&);
+  GMTable &operator=(const GMTable&);
+public:
+  /// Construct table
+  GMTable(FXComposite *p,FXObject* tgt=NULL,FXSelector sel=0,FXuint opts=0,FXint x=0,FXint y=0,FXint w=0,FXint h=0,FXint pl=DEFAULT_MARGIN,FXint pr=DEFAULT_MARGIN,FXint pt=DEFAULT_MARGIN,FXint pb=DEFAULT_MARGIN);
+  };
+
+// previous declaration
+class GMHotkeys;
+
+class GMHotkeyTable : public GMTable {
+  FXDECLARE(GMHotkeyTable)
+protected:
+  GMHotkeyTable();
+private:
+  GMHotkeyTable(const GMHotkeyTable&);
+  GMHotkeyTable &operator=(const GMHotkeyTable&);
+public:
+  /// Construct hotkey table
+  GMHotkeyTable(GMHotkeys *htkks,FXComposite *p,FXObject* tgt=NULL,FXSelector sel=0,FXuint opts=0,FXint x=0,FXint y=0,FXint w=0,FXint h=0,FXint pl=DEFAULT_MARGIN,FXint pr=DEFAULT_MARGIN,FXint pt=DEFAULT_MARGIN,FXint pb=DEFAULT_MARGIN);
+  GMHotkeys *hotkeys; 
+  FXTablePos* getCurrentPos(void) { return &current; }
+  virtual FXbool acceptInput(FXbool notify=false);
+protected:
+  virtual FXTableItem* createItem(const FXString& text,FXIcon* icon,void* ptr);
+  }; 
+
+class GMTextFieldWithButton : public FXPacker {
+  FXDECLARE(GMTextFieldWithButton)
+protected:
+  GMTextField  *field;
+  GMButton *button;
+public:
+  enum {
+    ID_TEXT=FXPacker::ID_LAST,
+    ID_CLEAR,
+    ID_LAST
+  };
+protected:
+  GMTextFieldWithButton(){}
+private:
+  GMTextFieldWithButton(const GMTextFieldWithButton&);
+  GMTextFieldWithButton &operator=(const GMTextFieldWithButton&);
+public:
+  GMTextFieldWithButton(FXComposite *p,FXint cols,FXObject* tgt=NULL,FXSelector sel=0,FXuint opts=TEXTFIELD_NORMAL,FXint x=0,FXint y=0,FXint w=0,FXint h=0,FXint pl=DEFAULT_PAD,FXint pr=DEFAULT_PAD,FXint pt=DEFAULT_PAD,FXint pb=DEFAULT_PAD);
+  
+  long onKeyPress(FXObject*,FXSelector,void*);
+  long onTextButton(FXObject*,FXSelector,void*);
+  long onFwdToText(FXObject*,FXSelector,void*);
+
+  virtual void create();
+  virtual void detach();
+  virtual void destroy();
+  virtual void enable();
+  virtual void disable();
+  virtual FXint getDefaultWidth();
+  virtual FXint getDefaultHeight();
+  virtual void layout();
+  FXbool isEditable() const;
+  void setEditable(FXbool edit=true);
+  void setText(const FXString& text,FXbool notify=false);
+  FXString getText() const;
+  void setNumColumns(FXint cols);
+  FXint getNumColumns() const;
+  void setFont(FXFont* fnt);
+  FXFont* getFont() const;
+  void setJustify(FXuint mode);
+  FXuint getJustify() const;
+  virtual void setBackColor(FXColor clr);
+  FXColor getBackColor() const;
+  void setTextColor(FXColor clr);
+  FXColor getTextColor() const;
+  void setSelBackColor(FXColor clr);
+  FXColor getSelBackColor() const;
+  void setSelTextColor(FXColor clr);
+  FXColor getSelTextColor() const;
+  void setHelpText(const FXString& txt);
+  const FXString& getHelpText() const;
+  void setTipText(const FXString& txt);
+  const FXString& getTipText() const;
+  virtual void save(FXStream& store) const;
+  virtual void load(FXStream& store);
+  virtual ~GMTextFieldWithButton();
+  };
+
+class GMHotkeyTextFieldWithButton : public GMTextFieldWithButton {
+  FXDECLARE(GMHotkeyTextFieldWithButton)
+protected:
+  GMHotkeyTextFieldWithButton(){}
+private:
+  GMHotkeyTextFieldWithButton(const GMHotkeyTextFieldWithButton&);
+  GMHotkeyTextFieldWithButton &operator=(const GMHotkeyTextFieldWithButton&);
+public:
+  GMHotkeyTextFieldWithButton(FXComposite *p,FXint cols,FXObject* tgt=NULL,FXSelector sel=0,FXuint opts=TEXTFIELD_NORMAL,FXint x=0,FXint y=0,FXint w=0,FXint h=0,FXint pl=DEFAULT_PAD,FXint pr=DEFAULT_PAD,FXint pt=DEFAULT_PAD,FXint pb=DEFAULT_PAD);
+
+  long onTextButton(FXObject*,FXSelector,void*);
+private:
+  GMHotkeyTable *table;
+  };
 
 #endif

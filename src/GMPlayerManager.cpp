@@ -680,6 +680,9 @@ void GMPlayerManager::init_window(FXbool wizard) {
   tooltip->create();
   ewmh_change_window_type(tooltip,WINDOWTYPE_TOOLTIP);
 
+  /// Load hotkeys
+  preferences.hotkeys->load();
+
   if (database->isEmpty() && wizard) {
     cleanSourceSettings();
     mainwindow->init(SHOW_WIZARD);
@@ -1894,7 +1897,7 @@ void GMPlayerManager::register_global_hotkeys() {
   XSetErrorHandler(previous);
   }
 
-FXbool GMPlayerManager::handle_global_hotkeys(FXuint code) {
+FXbool GMPlayerManager::handle_global_hotkeys(FXuint code, FXuint modifier) {
   switch(code) {
 //    case XF86XK_AudioMute	        : break;
 //    case XF86XK_AudioRaiseVolume	: break;

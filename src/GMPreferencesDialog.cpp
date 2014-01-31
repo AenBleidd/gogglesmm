@@ -23,6 +23,8 @@
 
 #include <FXPNGIcon.h>
 
+#include <fxkeys.h>
+
 #include "GMTrack.h"
 #include "GMApp.h"
 #include "GMAudioPlayer.h"
@@ -710,13 +712,62 @@ GMPreferencesDialog::GMPreferencesDialog(FXWindow * p) : FXDialogBox(p,FXString:
   gainlist->appendItem(tr("Album"));
   gainlist->setNumVisible(3);
 
+  new GMTabItem(tabbook,tr("&Hotkeys"),NULL,TAB_TOP_NORMAL,0,0,0,0,5,5);
+  vframe = new GMTabFrame(tabbook);
 
+  grpbox = new FXGroupBox(vframe,tr("Warning"),FRAME_NONE|LAYOUT_BOTTOM|LAYOUT_FILL_X,0,0,0,0,20);
+
+  grpbox->setFont(GMApp::instance()->getThickFont());
+
+  new FXLabel(grpbox,tr("Please don't use key combination for changing keyboard layout as hotkey.\nIt may not work and cause some problems."),
+             NULL,LAYOUT_BOTTOM|LAYOUT_FILL_X|LABEL_NORMAL|JUSTIFY_LEFT);
+
+  hotkeys_table = new GMHotkeyTable(GMPlayerManager::instance()->getPreferences().hotkeys,vframe,this,ID_HOTKEYS_TABLE,TABLE_NO_COLSELECT|TABLE_NO_ROWSELECT|LAYOUT_FILL_X|LAYOUT_FILL_Y|TABLE_COL_SIZABLE);
+  hotkeys_table->setTableSize(6,2);
+  hotkeys_table->setVisibleColumns(2);
+  hotkeys_table->setVisibleRows(6);
+  hotkeys_table->setRowHeaderMode(LAYOUT_MIN_WIDTH);
+  hotkeys_table->setColumnText(0,tr("Global"));
+  hotkeys_table->setColumnText(1,tr("Local"));
+  hotkeys_table->setRowText(0,tr("Play"));
+  hotkeys_table->setRowText(1,tr("Play/Pause"));
+  hotkeys_table->setRowText(2,tr("Pause"));
+  hotkeys_table->setRowText(3,tr("Stop"));
+  hotkeys_table->setRowText(4,tr("Previous track"));
+  hotkeys_table->setRowText(5,tr("Next track"));
+  
+  hotkeys_table->hotkeys->init();
+
+  hotkeys_table->setItemText(0, 0, hotkeys_table->hotkeys->gm_convert_hotkey_to_string(hotkeys_table->hotkeys->global_play));
+  hotkeys_table->setItemText(0, 1, hotkeys_table->hotkeys->gm_convert_hotkey_to_string(hotkeys_table->hotkeys->local_play));
+  hotkeys_table->setItemText(1, 0, hotkeys_table->hotkeys->gm_convert_hotkey_to_string(hotkeys_table->hotkeys->global_playpause));
+  hotkeys_table->setItemText(1, 1, hotkeys_table->hotkeys->gm_convert_hotkey_to_string(hotkeys_table->hotkeys->local_playpause));
+  hotkeys_table->setItemText(2, 0, hotkeys_table->hotkeys->gm_convert_hotkey_to_string(hotkeys_table->hotkeys->global_pause));
+  hotkeys_table->setItemText(2, 1, hotkeys_table->hotkeys->gm_convert_hotkey_to_string(hotkeys_table->hotkeys->local_pause));
+  hotkeys_table->setItemText(3, 0, hotkeys_table->hotkeys->gm_convert_hotkey_to_string(hotkeys_table->hotkeys->global_stop));
+  hotkeys_table->setItemText(3, 1, hotkeys_table->hotkeys->gm_convert_hotkey_to_string(hotkeys_table->hotkeys->local_stop));
+  hotkeys_table->setItemText(4, 0, hotkeys_table->hotkeys->gm_convert_hotkey_to_string(hotkeys_table->hotkeys->global_prev));
+  hotkeys_table->setItemText(4, 1, hotkeys_table->hotkeys->gm_convert_hotkey_to_string(hotkeys_table->hotkeys->local_prev));
+  hotkeys_table->setItemText(5, 0, hotkeys_table->hotkeys->gm_convert_hotkey_to_string(hotkeys_table->hotkeys->global_next));
+  hotkeys_table->setItemText(5, 1, hotkeys_table->hotkeys->gm_convert_hotkey_to_string(hotkeys_table->hotkeys->local_next));
+
+// set default column size to 100 if we can't read saved value even if we check this value (it's impossible but...)
+  if (GMApp::instance()->reg().readIntEntry(HOTKEY_REG_SECTION, "table_column_global_size",-1) != -1)
+    hotkeys_table->setColumnWidth(0,GMApp::instance()->reg().readIntEntry(HOTKEY_REG_SECTION, "table_column_global_size",100));
+  if (GMApp::instance()->reg().readIntEntry(HOTKEY_REG_SECTION, "table_column_local_size",-1) != -1)
+    hotkeys_table->setColumnWidth(1,GMApp::instance()->reg().readIntEntry(HOTKEY_REG_SECTION, "table_column_local_size",100));
+  
   FXHorizontalFrame *closebox=new FXHorizontalFrame(main,LAYOUT_BOTTOM|LAYOUT_FILL_X|PACK_UNIFORM_WIDTH,0,0,0,0,0,0,0,0);
   new GMButton(closebox,tr("&Close"),NULL,this,FXDialogBox::ID_ACCEPT,BUTTON_INITIAL|BUTTON_DEFAULT|LAYOUT_RIGHT|FRAME_RAISED|FRAME_THICK,0,0,0,0, 20,20);
 
   }
 
 GMPreferencesDialog::~GMPreferencesDialog(){
+  GMApp::instance()->reg().writeIntEntry(HOTKEY_REG_SECTION, "table_column_global_size", hotkeys_table->getColumnWidth(0));
+  GMApp::instance()->reg().writeIntEntry(HOTKEY_REG_SECTION, "table_column_local_size", hotkeys_table->getColumnWidth(1));
+  hotkeys_table->hotkeys->save();
+  hotkeys_table->hotkeys->free();
+  delete hotkeys_table;
   }
 
 

@@ -92,4 +92,49 @@ extern void gm_print_time(FXint nseconds,FXString & result);
 
 extern FXbool gm_parse_datetime(const FXString & str,FXTime & timestamp);
 
+#define HOTKEY_REG_SECTION "hotkeys"
+
+struct HOTKEY {
+  int keycode;
+  int modifier;
+};
+struct GM_KEYSTRINGS {
+  int keycode;
+  FXString str;
+  };
+class GMHotkeys {
+public:
+  GMHotkeys();
+public:
+  void init();
+  void save();
+  void load();
+  void free();
+public:
+  FXString gm_convert_hotkeyevent_to_string(const FXEvent*);
+  FXString gm_convert_hotkeycode_to_string(int state, int code);
+  FXString gm_convert_hotkey_to_string(HOTKEY hotkey) { return gm_convert_hotkeycode_to_string(hotkey.modifier, hotkey.keycode); }
+public:
+  HOTKEY last_hotkey;
+
+  HOTKEY global_play;
+  HOTKEY local_play;
+  HOTKEY global_playpause;
+  HOTKEY local_playpause;
+  HOTKEY global_pause;
+  HOTKEY local_pause;
+  HOTKEY global_stop;
+  HOTKEY local_stop;
+  HOTKEY global_prev;
+  HOTKEY local_prev;
+  HOTKEY global_next;
+  HOTKEY local_next;
+private:
+  GM_KEYSTRINGS *gm_keystrings;
+  int gm_keystrings_count;
+private:
+  void gm_free_keystrings(void);
+  bool gm_prepare_keystrings(void);
+};
+
 #endif

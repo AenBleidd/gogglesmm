@@ -352,7 +352,7 @@ FXbool GMApp::dispatchEvent(FXRawEvent & ev) {
 
     if (ev.xany.type==KeyPress) {
       //fxmessage("keypress %d %x\n",ev.xkey.keycode,keysym(ev));
-      if (GMPlayerManager::instance()->handle_global_hotkeys(keysym(ev)))
+      if (GMPlayerManager::instance()->handle_global_hotkeys(keysym(ev), ev.xkey.state))
         return true;
       }
     else if (ev.xany.type==ClientMessage) {
