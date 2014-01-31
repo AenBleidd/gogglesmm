@@ -30,6 +30,35 @@
 #include "GMImportDialog.h"
 
 
+static const FXchar * const imagetypes[]={
+  "png",";Portable Network Graphics",
+  "jpg",";JPEG",
+  "jpeg",";JPEG",
+  "bmp",";BMP",
+  "gif",";GIF"
+  };
+
+static const FXchar * const filetypes[]={
+  "mp3",";MPEG-1 Audio Layer 3",
+  "ogg",";Ogg Vorbis",
+  "oga",";Ogg Audio",
+  "opus",";Opus Audio",
+  "flac",";Free Lossless Audio Codec",
+#if 0
+  "mpc",";Musepack",
+  "wma",";Windows Media",
+  "asf",";Windows Media",
+#endif
+  "m4a",";MPEG-4 Part 14",
+  "m4b",";MPEG-4 Part 14",
+  "m4p",";MPEG-4 Part 14",
+  "aac",";MPEG-4 Part 14",
+  "m3u",";M3U Playlist",
+  "pls",";PLS Playlist",
+  "xspf",";XML Shareable Playlist"
+  };
+
+
 extern const FXchar gmfilepatterns[]="All Music (*.mp3,*.ogg,*.oga,*.opus,*.flac"
 ",*.aac,*.m4a,*.m4p,*.mp4,*.m4b"
 #if 0
@@ -53,14 +82,63 @@ extern const FXchar gmfilepatterns[]="All Music (*.mp3,*.ogg,*.oga,*.opus,*.flac
 const FXchar playlist_patterns[]="All Playlists (*.xspf,*.pls,*.m3u)\nXML Shareable Playlist (*.xspf)\nPLS (*.pls)\nM3U (*.m3u)";
 
 
+
+
+class GMFileAssociations : public FXFileAssociations {
+
+public:
+  GMFileAssociations(FXApp*app) : FXFileAssociations(app) {
+    FXFileAssoc* assoc = new FXFileAssoc;
+    assoc->bigicon  = GMIconTheme::instance()->icon_file_big;
+    assoc->miniicon = GMIconTheme::instance()->icon_file_small;
+    bindings[FXFileAssociations::defaultFileBinding]=assoc;
+
+    assoc = new FXFileAssoc;
+    assoc->bigicon      = GMIconTheme::instance()->icon_folder_big;
+    assoc->miniicon     = GMIconTheme::instance()->icon_folder_small;
+    assoc->miniiconopen = GMIconTheme::instance()->icon_folder_open_small;
+    bindings[FXFileAssociations::defaultDirBinding]=assoc;
+    }
+
+  void initFileBindings() {
+    FXFileAssoc * assoc=NULL;
+
+    for (FXuint i=0;i<ARRAYNUMBER(filetypes);i+=2) {
+      assoc = new FXFileAssoc;
+      assoc->extension = filetypes[i+1];
+      assoc->bigicon  = GMIconTheme::instance()->icon_audio_big;
+      assoc->miniicon = GMIconTheme::instance()->icon_audio_small;
+      bindings[filetypes[i]]=assoc;
+      }
+
+    for (FXuint i=0;i<ARRAYNUMBER(imagetypes);i+=2){
+      assoc = new FXFileAssoc;
+      assoc->extension = imagetypes[i+1];
+      assoc->bigicon  = GMIconTheme::instance()->icon_image_big;
+      assoc->miniicon = GMIconTheme::instance()->icon_image_small;
+      bindings[imagetypes[i]]=assoc;
+      }
+    }
+   
+  FXFileAssoc* findFileBinding(const FXString& pathname){
+    FXString ext = FXPath::extension(pathname);
+    FXFileAssoc * record = NULL;
+    if ((record = bindings[ext])!=NULL) return record;
+    if ((record = bindings[ext.lower()])!=NULL) return record;
+    return bindings[defaultFileBinding];
+    }  
+
+  FXFileAssoc* findDirBinding(const FXString&){
+    return bindings[defaultDirBinding];
+    }
+
+  ~GMFileAssociations() {
+    }
+  };
+
+
 class GMDirSelector : public FXDirSelector {
 FXDECLARE(GMDirSelector)
-protected:
-  FXFileDict * filedict;
-  FXSettings * fileassoc;
-protected:
-  FXIconPtr icon_folder;
-  FXIconPtr icon_folderopen;
 protected:
   GMDirSelector(){}
 private:
@@ -69,17 +147,12 @@ private:
 public:
   GMDirSelector(FXComposite *p,FXObject* tgt=NULL,FXSelector sel=0,FXuint opts=0,FXint x=0,FXint y=0,FXint w=0,FXint h=0);
   ~GMDirSelector();
-  void initFileDict();
   };
 
 
 FXIMPLEMENT(GMDirSelector,FXDirSelector,NULL,0);
 
 GMDirSelector::GMDirSelector(FXComposite *p,FXObject* tgt,FXSelector sel,FXuint opts,FXint x,FXint y,FXint w,FXint h):FXDirSelector(p,tgt,sel,opts,x,y,w,h) {
-  fileassoc=new FXSettings();
-  filedict=new FXFileDict(getApp(),fileassoc);
-  initFileDict();
-
   delete accept->getParent();
   delete dirbox->getParent();
   delete dirname->getParent();
@@ -101,7 +174,8 @@ GMDirSelector::GMDirSelector(FXComposite *p,FXObject* tgt,FXSelector sel,FXuint 
   GMScrollArea::replaceScrollbars(dirbox);
   ((FXVerticalFrame*)dirbox->getParent())->setFrameStyle(FRAME_LINE);
 
-  dirbox->setAssociations(filedict,false);
+  GMFileAssociations * assoc = new GMFileAssociations(getApp());    
+  dirbox->setAssociations(assoc,true);
 /*
   getFirst()->hide();
   FXFrame * frame=(FXFrame*)getFirst()->getNext();
@@ -113,8 +187,8 @@ GMDirSelector::GMDirSelector(FXComposite *p,FXObject* tgt,FXSelector sel,FXuint 
   }
 
 GMDirSelector::~GMDirSelector(){
-  delete fileassoc;
-  delete filedict;
+//  delete fileassoc;
+//  delete filedict;
   }
 
 
@@ -122,8 +196,7 @@ GMDirSelector::~GMDirSelector(){
 class GMFileSelector : public FXFileSelector {
 FXDECLARE(GMFileSelector)
 protected:
-  FXFileDict * filedict;
-  FXSettings * fileassoc;
+  GMFileAssociations * fileassoc;
 protected:
   GMFileSelector(){}
 private:
@@ -133,7 +206,6 @@ public:
   GMFileSelector(FXComposite *p,FXObject* tgt=NULL,FXSelector sel=0,FXuint opts=0,FXint x=0,FXint y=0,FXint w=0,FXint h=0);
   ~GMFileSelector();
 
-  void initFileDict();
   void hideButtons();
   void getSelectedFiles(FXStringList & files);
 
@@ -143,6 +215,8 @@ public:
 FXIMPLEMENT(GMFileSelector,FXFileSelector,NULL,0);
 
 GMFileSelector::GMFileSelector(FXComposite *p,FXObject* tgt,FXSelector sel,FXuint opts,FXint x,FXint y,FXint w,FXint h):FXFileSelector(p,tgt,sel,opts,x,y,w,h) {
+
+
   FXWindow * window=NULL;
   while((window=getFirst())!=NULL) delete window;
   delete bookmarkmenu; bookmarkmenu=NULL;
@@ -170,7 +244,7 @@ GMFileSelector::GMFileSelector(FXComposite *p,FXObject* tgt,FXSelector sel,FXuin
   new FXLabel(navbuttons,tr("Directory:"),NULL,LAYOUT_CENTER_Y);
   dirbox=new FXDirBox(navbuttons,this,ID_DIRTREE,DIRBOX_NO_OWN_ASSOC|FRAME_LINE|LAYOUT_FILL_X|LAYOUT_CENTER_Y,0,0,0,0,1,1,1,1);
   dirbox->setNumVisible(5);
-  dirbox->setAssociations(filebox->getAssociations(),false);    // Shared file associations
+  //dirbox->setAssociations(filebox->getAssociations(),false);    // Shared file associations
   GMTreeListBox::replace(dirbox);
 
 
@@ -242,11 +316,11 @@ GMFileSelector::GMFileSelector(FXComposite *p,FXObject* tgt,FXSelector sel,FXuin
   navigable=true;
 
 
-  fileassoc=new FXSettings();
-  filedict=new FXFileDict(getApp(),fileassoc);
-  initFileDict();
-  filebox->setAssociations(filedict,false);
-  dirbox->setAssociations(filedict,false);
+
+  fileassoc = new GMFileAssociations(getApp());
+  fileassoc->initFileBindings();
+  filebox->setAssociations(fileassoc,false);
+  dirbox->setAssociations(fileassoc,false);
 /*
   entryblock->childAtIndex(2)->hide();
   cancel->hide();
@@ -265,7 +339,6 @@ GMFileSelector::GMFileSelector(FXComposite *p,FXObject* tgt,FXSelector sel,FXuin
 
 GMFileSelector::~GMFileSelector(){
   delete fileassoc;
-  delete filedict;
   }
 
 
@@ -287,84 +360,6 @@ void GMFileSelector::getSelectedFiles(FXStringList & files) {
     FXASSERT(0);
     }
   }
-
-
-
-
-
-static const FXchar * const imagetypes[]={
-  "png",";Portable Network Graphics",
-  "jpg",";JPEG",
-  "jpeg",";JPEG",
-  "bmp",";BMP",
-  "gif",";GIF"
-  };
-
-static const FXchar * const filetypes[]={
-  "mp3",";MPEG-1 Audio Layer 3",
-  "ogg",";Ogg Vorbis",
-  "oga",";Ogg Audio",
-  "opus",";Opus Audio",
-  "flac",";Free Lossless Audio Codec",
-#if 0
-  "mpc",";Musepack",
-  "wma",";Windows Media",
-  "asf",";Windows Media",
-#endif
-  "m4a",";MPEG-4 Part 14",
-  "m4b",";MPEG-4 Part 14",
-  "m4p",";MPEG-4 Part 14",
-  "aac",";MPEG-4 Part 14",
-  "m3u",";M3U Playlist",
-  "pls",";PLS Playlist",
-  "xspf",";XML Shareable Playlist"
-  };
-
-
-void GMFileSelector::initFileDict() {
-  FXFileAssoc * assoc=NULL;
-  for (FXuint i=0;i<ARRAYNUMBER(filetypes);i+=2) {
-    assoc = filedict->replace(filetypes[i],filetypes[i+1]);
-    assoc->bigicon  = GMIconTheme::instance()->icon_audio_big;
-    assoc->miniicon = GMIconTheme::instance()->icon_audio_small;
-    assoc = filedict->replace(FXString(filetypes[i]).upper().text(),filetypes[i+1]);
-    assoc->bigicon  = GMIconTheme::instance()->icon_audio_big;
-    assoc->miniicon = GMIconTheme::instance()->icon_audio_small;
-    }
-
-  for (FXuint i=0;i<ARRAYNUMBER(imagetypes);i+=2) {
-    assoc = filedict->replace(imagetypes[i],imagetypes[i+1]);
-    assoc->bigicon  = GMIconTheme::instance()->icon_image_big;
-    assoc->miniicon = GMIconTheme::instance()->icon_image_small;
-    assoc = filedict->replace(FXString(filetypes[i]).upper().text(),imagetypes[i+1]);
-    assoc->bigicon  = GMIconTheme::instance()->icon_image_big;
-    assoc->miniicon = GMIconTheme::instance()->icon_image_small;
-    }
-
-  assoc = filedict->replace(FXFileDict::defaultFileBinding,";");
-  assoc->bigicon  = GMIconTheme::instance()->icon_file_big;
-  assoc->miniicon = GMIconTheme::instance()->icon_file_small;
-
-  assoc = filedict->replace(FXFileDict::defaultDirBinding,";");
-  assoc->bigicon      = GMIconTheme::instance()->icon_folder_big;
-  assoc->miniicon     = GMIconTheme::instance()->icon_folder_small;
-  }
-
-void GMDirSelector::initFileDict() {
-  FXFileAssoc * assoc=NULL;
-  assoc = filedict->replace(FXFileDict::defaultDirBinding,";");
-  assoc->miniiconopen = GMIconTheme::instance()->icon_folder_open_small;
-  assoc->miniicon     = GMIconTheme::instance()->icon_folder_small;
-  }
-
-
-
-
-
-
-
-
-
 
 
 FXIMPLEMENT(GMFileDialog,FXFileDialog,NULL,0);

@@ -41,9 +41,22 @@ struct ReplayGainConfig {
 
 class OutputThread : public EngineThread {
 protected:
-  Event * wait_for_event();
-protected:
   OutputConfig   output_config;
+protected:
+  Reactor           reactor;
+  Reactor::Input*   fifoinput;
+protected:
+  /// Wait while pausing
+  Event * wait_pause();
+
+  /// Wait while draining
+  Event * wait_drain();
+
+  /// Wait normal events
+  Event * wait_event();
+
+  /// Get Next Event
+  Event * get_next_event();
 public:
   AudioFormat       af;
   OutputPlugin *    plugin;
@@ -52,6 +65,7 @@ public:
   MemoryBuffer      src_input;
   MemoryBuffer      src_output;
   ReplayGainConfig  replaygain;
+  Packet * packet_queue;
 protected:
   FXbool draining;
   FXbool pausing;
@@ -73,6 +87,7 @@ protected:
   void close_plugin();
   void process(Packet*);
 
+
 #ifdef HAVE_SAMPLERATE_PLUGIN
   void resample(Packet*,FXint & nframes);
 #endif
@@ -85,6 +100,21 @@ protected:
   void reconfigure();
 public:
   OutputThread(AudioEngine*);
+
+  virtual FXbool init();
+
+  void getSamples(const void*&,FXuint &);
+
+  void notify_volume(FXfloat value);
+
+  
+  Reactor & getReactor() { return reactor; }
+
+
+  void wait_plugin_events();
+
+
+
   virtual FXint run();
   virtual ~OutputThread();
   };

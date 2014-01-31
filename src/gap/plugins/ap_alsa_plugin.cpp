@@ -24,6 +24,7 @@
 #include "ap_event.h"
 #include "ap_buffer.h"
 #include "ap_packet.h"
+#include "ap_reactor.h"
 #include "ap_event_queue.h"
 #include "ap_thread_queue.h"
 #include "ap_engine.h"
@@ -33,6 +34,7 @@
 #include "ap_output_plugin.h"
 #include "ap_decoder_plugin.h"
 #include "ap_decoder_thread.h"
+#include "ap_output_thread.h"
 #include "ap_alsa_plugin.h"
 
 #define ALSA_VERSION(major,minor,patch) ((major<<16)|(minor<<8)|patch)
@@ -42,8 +44,8 @@
 using namespace ap;
 
 
-extern "C" GMAPI OutputPlugin * ap_load_plugin() {
-  return new AlsaOutput();
+extern "C" GMAPI OutputPlugin * ap_load_plugin(OutputThread * output) {
+  return new AlsaOutput(output);
   }
 
 extern "C" GMAPI void ap_free_plugin(OutputPlugin* plugin) {
@@ -51,6 +53,8 @@ extern "C" GMAPI void ap_free_plugin(OutputPlugin* plugin) {
   }
 
 namespace ap {
+
+
 
 
 static snd_pcm_format_t alsaformat(const AudioFormat & af) {
@@ -513,7 +517,6 @@ public:
     if (!alsa.finish(out,can_pause,can_resume))
       return false;
 
-
     return true;
     }
 
@@ -521,47 +524,177 @@ public:
 
 
 
+class AlsaMixer : public Reactor::Native {
+private:
+  OutputThread      * output;
+  snd_mixer_t       * mixer;
+  snd_mixer_elem_t  * element;
+  FXint               nhandles;
 
-AlsaOutput::AlsaOutput() : OutputPlugin(), handle(NULL),mixer(NULL),mixer_element(NULL),can_pause(false),can_resume(false) {
+
+
+
+
+
+protected:
+  AlsaMixer(OutputThread * o,snd_mixer_t * m,snd_mixer_elem_t * e) : output(o),mixer(m),element(e) {
+    updateVolume();
+    nhandles=snd_mixer_poll_descriptors_count(mixer);
+    }
+public:
+  void updateVolume() {
+    FXfloat volume=0.0f;
+    long min,max;
+    long value;
+    int nvalues=0;
+    
+    if (snd_mixer_selem_get_playback_volume_range(element,&min,&max)<0)
+      return;  
+
+    GM_DEBUG_PRINT("Volume for channels:\n");
+    for (int c = SND_MIXER_SCHN_FRONT_LEFT;c<SND_MIXER_SCHN_LAST;c++){
+      if (snd_mixer_selem_has_playback_channel(element,(snd_mixer_selem_channel_id_t)c)==1){
+        if (snd_mixer_selem_get_playback_volume	(element,(snd_mixer_selem_channel_id_t)c,&value)==0) {
+          GM_DEBUG_PRINT("\tchannel %d volume %ld\n",c,value);
+          nvalues++;
+          volume+=value;
+          }
+        }
+      }
+    output->notify_volume(volume/(nvalues*(max-min)));
+    }
+
+
+  void volume(FXfloat v) {
+    long min,max;
+    snd_mixer_selem_get_playback_volume_range(element,&min,&max);
+    long value = FXLERP(min,max,v);
+    snd_mixer_selem_set_playback_volume_all(element,value);
+    }
+
+
+  virtual FXint no() { return nhandles; }
+
+  virtual void prepare(struct pollfd * pfds){
+    snd_mixer_poll_descriptors(mixer,pfds,nhandles); 
+    }
+  
+  virtual void dispatch(struct pollfd*) {
+    if (snd_mixer_handle_events(mixer)>0) {
+      updateVolume();
+      }
+    }
+
+  ~AlsaMixer() {
+    snd_mixer_close(mixer);
+    }
+
+protected:
+  static snd_mixer_elem_t * find_mixer_element_by_name(snd_mixer_t * mixer,const FXchar * name){
+    long volume;
+    for (snd_mixer_elem_t * element = snd_mixer_first_elem(mixer);element;element=snd_mixer_elem_next(element)){
+
+      /* Filter out the obvious ones */
+      if (!snd_mixer_selem_is_active(element) ||
+           snd_mixer_elem_get_type(element)!=SND_MIXER_ELEM_SIMPLE ||
+          !snd_mixer_selem_has_playback_volume(element))
+        continue;
+
+      /* Check if we can query the volume */
+      if (snd_mixer_selem_get_playback_volume(element,SND_MIXER_SCHN_FRONT_LEFT,&volume)<0 ||
+          snd_mixer_selem_get_playback_volume(element,SND_MIXER_SCHN_FRONT_RIGHT,&volume)<0 ){
+        continue;
+        }
+
+      /* If we don't know what we're looking for, return first one found */
+      if (name==NULL)
+        return element;
+
+      /* Check if this is the one we want */
+      if (comparecase(snd_mixer_selem_get_name(element),name)==0)
+        return element;
+
+      }
+    return NULL;
+    }
+
+
+public:
+  static AlsaMixer * open(OutputThread * output,snd_pcm_t * handle) {
+    FXString device;
+    snd_mixer_t*        mixer   = NULL;
+    snd_mixer_elem_t*   element = NULL;
+    snd_pcm_info_t*     info    = NULL;
+    FXint result;
+
+    snd_pcm_info_alloca(&info);
+  
+    if (snd_pcm_info(handle,info)<0)
+      return NULL;
+
+    if (snd_mixer_open(&mixer,0)<0)
+      return NULL;
+
+    device = snd_pcm_name(handle);
+
+    if ((result=snd_mixer_attach(mixer,device.text()))<0) {
+      GM_DEBUG_PRINT("Unable to attach mixer: %s\n",snd_strerror(result));
+     
+      // get card info
+      if ((result=snd_pcm_info_get_card(info))<0) {
+        GM_DEBUG_PRINT("Unable to query card: %s\n",snd_strerror(result));
+        goto fail;
+        }      
+
+      // try with hw name
+      device.format("hw:%d",snd_pcm_info_get_card(info));
+      if ((result=snd_mixer_attach(mixer,device.text()))<0) {  
+        GM_DEBUG_PRINT("Unable to attach mixer: %s\n",snd_strerror(result));
+        goto fail;
+        }
+      }
+
+    // register mixer
+    if ((result=snd_mixer_selem_register(mixer,NULL,NULL))<0){
+      GM_DEBUG_PRINT("Unable to register simple mixer: %s\n",snd_strerror(result));
+      goto fail;
+      }
+
+    // load mixer
+    if ((result=snd_mixer_load(mixer))<0) {
+      GM_DEBUG_PRINT("Unable to load mixer: %s\n",snd_strerror(result));
+      goto fail;
+      }
+
+    /* Yay... let's guess what mixer we want */
+    element = find_mixer_element_by_name(mixer,"PCM");
+    if (element==NULL) {
+      element = find_mixer_element_by_name(mixer,"MASTER");
+      if (element==NULL) {
+        element = find_mixer_element_by_name(mixer,NULL);
+        }
+      }
+
+    // If we found an element
+    if (element) {
+      return new AlsaMixer(output,mixer,element);
+      }
+fail:
+    if (mixer) snd_mixer_close(mixer);
+    return NULL;
+    }
+    
+
+  };
+
+
+
+
+AlsaOutput::AlsaOutput(OutputThread * o) : OutputPlugin(o), handle(NULL),mixer(NULL),can_pause(false),can_resume(false) {
   }
 
 AlsaOutput::~AlsaOutput() {
   close();
-  }
-
-
-FXbool AlsaOutput::setOutputConfig(const OutputConfig & c) {
-  config=c.alsa;
-  return true;
-  }
-
-
-static snd_mixer_elem_t * find_mixer_element_by_name(snd_mixer_t * mixer,const FXchar * name){
-  long volume;
-  for (snd_mixer_elem_t * element = snd_mixer_first_elem(mixer);element;element=snd_mixer_elem_next(element)){
-
-    /* Filter out the obvious ones */
-    if (!snd_mixer_selem_is_active(element) ||
-         snd_mixer_elem_get_type(element)!=SND_MIXER_ELEM_SIMPLE ||
-        !snd_mixer_selem_has_playback_volume(element))
-      continue;
-
-    /* Check if we can query the volume */
-    if (snd_mixer_selem_get_playback_volume(element,SND_MIXER_SCHN_FRONT_LEFT,&volume)<0 ||
-        snd_mixer_selem_get_playback_volume(element,SND_MIXER_SCHN_FRONT_RIGHT,&volume)<0 ){
-      continue;
-      }
-
-    /* If we don't know what we're looking for, return first one found */
-    if (name==NULL)
-      return element;
-
-    /* Check if this is the one we want */
-    if (comparecase(snd_mixer_selem_get_name(element),name)==0)
-      return element;
-
-    }
-  return NULL;
   }
 
 FXbool AlsaOutput::open() {
@@ -574,89 +707,37 @@ FXbool AlsaOutput::open() {
       }
 
     GM_DEBUG_PRINT("[alsa] opened device \"%s\"\n",config.device.text());
-
-    snd_pcm_info_t* info;
-    snd_pcm_info_alloca(&info);
-
-    if (snd_pcm_info(handle,info)>=0) {
-      GM_DEBUG_PRINT("alsa device: %s %s %s\n",snd_pcm_info_get_id(info),snd_pcm_info_get_name(info),snd_pcm_info_get_subdevice_name(info));
-      if (snd_mixer_open(&mixer,0)<0) {
-        GM_DEBUG_PRINT("Unable to open mixer: %s\n",snd_strerror(result));
-        return true;
-        }
-
-      FXString mixerdevice = snd_pcm_name(handle);
-
-      if ((result=snd_mixer_attach(mixer,mixerdevice.text()))<0) {
-        GM_DEBUG_PRINT("Unable to attach mixer: %s\n",snd_strerror(result));
-        if (snd_pcm_info_get_card(info)!=-1) {
-          mixerdevice.format("hw:%d",snd_pcm_info_get_card(info));
-          if ((result=snd_mixer_attach(mixer,mixerdevice.text()))<0) {
-            GM_DEBUG_PRINT("Unable to attach mixer: %s\n",snd_strerror(result));
-            snd_mixer_close(mixer);
-            mixer=NULL;
-            return true;
-            }
-          }
-        else {
-          snd_mixer_close(mixer);
-          mixer=NULL;
-          return true;
-          }
-        }
-
-      GM_DEBUG_PRINT("mixer device: %s\n",mixerdevice.text());
-
-      if ((result=snd_mixer_selem_register(mixer,NULL,NULL))<0){
-        GM_DEBUG_PRINT("Unable to register simple mixer: %s\n",snd_strerror(result));
-        snd_mixer_close(mixer);
-        mixer=NULL;
-        return true;
-        }
-
-      if ((result=snd_mixer_load(mixer))<0) {
-        GM_DEBUG_PRINT("Unable to attach mixer: %s\n",snd_strerror(result));
-        snd_mixer_close(mixer);
-        mixer=NULL;
-        return true;
-        }
-
-      /* Yay... let's guess what mixer we want */
-      mixer_element = find_mixer_element_by_name(mixer,"PCM");
-      if (mixer_element==NULL) {
-        mixer_element = find_mixer_element_by_name(mixer,"MASTER");
-        if (mixer_element==NULL) {
-          mixer_element = find_mixer_element_by_name(mixer,NULL);
-          }
-        }
-
-#ifdef DEBUG
-      if (mixer_element)
-        GM_DEBUG_PRINT("[alsa] Using mixer element: %s\n",snd_mixer_selem_get_name(mixer_element));
-#endif
-      if (mixer_element==NULL) {
-        snd_mixer_close(mixer);
-        mixer=NULL;
-        }
-      }
+    mixer = AlsaMixer::open(output,handle);
+    if (mixer) output->getReactor().addNative(mixer);
     }
   return true;
   }
 
-void AlsaOutput::volume(FXfloat v) {
-  if (mixer && mixer_element) {
-    long min,max;
-    snd_mixer_selem_get_playback_volume_range(mixer_element,&min,&max);
-    long value = FXLERP(min,max,v);
+void AlsaOutput::close() {
+  GM_DEBUG_PRINT("[alsa] closing device\n");
+  if (handle) {
+    snd_pcm_drop(handle);
 
-    snd_mixer_selem_set_playback_volume_all(mixer_element,value);
+    if (mixer) {
+      output->getReactor().removeNative(mixer);
+      delete mixer;
+      mixer=NULL;
+      }
 
-//    snd_mixer_selem_set_playback_volume(mixer_element,SND_MIXER_SCHN_FRONT_LEFT,volume);
-//    snd_mixer_selem_set_playback_volume(mixer_element,SND_MIXER_SCHN_FRONT_RIGHT,volume);
-//    fxmessage("vol: %g %d\n",v,value);
+    snd_pcm_close(handle);
+    handle=NULL;
     }
+  af.reset();
   }
 
+FXbool AlsaOutput::setOutputConfig(const OutputConfig & c) {
+  config=c.alsa;
+  return true;
+  }
+
+void AlsaOutput::volume(FXfloat v) {
+  if (mixer) mixer->volume(v);
+  }
 
 FXint AlsaOutput::delay() {
   snd_pcm_sframes_t nframes=0;
@@ -671,21 +752,6 @@ FXint AlsaOutput::delay() {
       }
     }
   return nframes;
-  }
-
-void AlsaOutput::close() {
-  GM_DEBUG_PRINT("[alsa] closing device\n");
-  if (handle) {
-    snd_pcm_drop(handle);
-    if (mixer) {
-      snd_mixer_close(mixer);
-      mixer=NULL;
-      mixer_element=NULL;
-      }
-    snd_pcm_close(handle);
-    handle=NULL;
-    }
-  af.reset();
   }
 
 
@@ -767,7 +833,7 @@ FXbool AlsaOutput::write(const void * buffer,FXuint nframes){
           GM_DEBUG_PRINT("[alsa] xrun\n");
           result = snd_pcm_prepare(handle);
           if (result<0) {
-            fxmessage("[alsa] %s",snd_strerror(result));
+            GM_DEBUG_PRINT("[alsa] %s",snd_strerror(result));
             return false;
             }
         } break;

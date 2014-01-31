@@ -592,7 +592,7 @@ protected:
     FXlong     offset = 0;
 
     if (FXStat::exists(filename) && resume) {
-      fxmessage("file %s exists trying resume\n",filename.text());
+      GM_DEBUG_PRINT("file %s exists trying resume\n",filename.text());
       mode    = FXIO::ReadWrite|FXIO::Append;
       offset  = FXStat::size(filename);
       if (offset>0) {
@@ -603,12 +603,12 @@ protected:
       }
 
     if (!file.open(filename,mode)){
-      fxmessage("failed to open file\n");
+      GM_DEBUG_PRINT("failed to open file\n");
       return false;
       }
 
     if (!http.basic("GET",url,headers)) {
-      fxmessage("failed to get url %s\n",url.text());
+      GM_DEBUG_PRINT("failed to get url %s\n",url.text());
       return false;
       }
 
@@ -618,25 +618,25 @@ protected:
         return false;
 
       // FIXME make sure range is what we requested...
-      fxmessage("got partial content %lld-%lld of %lld\n",range.first,range.last,range.length);
+      GM_DEBUG_PRINT("got partial content %lld-%lld of %lld\n",range.first,range.last,range.length);
       }
     else if (http.status.code == HTTP_REQUESTED_RANGE_NOT_SATISFIABLE) {
       //FXString range = http.getHeader("content-range");
       //fxmessage("range: %s\n",range.text());
       //return false;
 
-      fxmessage("partial content failed\n");
+      GM_DEBUG_PRINT("partial content failed\n");
       http.discard();
       if (!http.basic("GET",url) || http.status.code!=HTTP_OK)
         return false;
       file.truncate(0);
       }
     else if (http.status.code == HTTP_OK) {
-      fxmessage("full content\n");
+      GM_DEBUG_PRINT("full content\n");
       file.truncate(0);
       }
     else {
-      fxmessage("failed %d\n",http.status.code);
+      GM_DEBUG_PRINT("failed %d\n",http.status.code);
       return false;
       }
 
@@ -867,7 +867,7 @@ FXint GMPodcastUpdater::run() {
 
    fxmessage("%s - %s\n",url.text(),FXSystem::universalTime(date).text());
 
-    FXDict guids;
+    FXDictionary guids;
     for (int i=0;i<rss.feed.items.no();i++)
         guids.insert(rss.feed.items[i].id.text(),(void*)(FXival)1);
 
@@ -875,7 +875,7 @@ FXint GMPodcastUpdater::run() {
     while(all_items.row()){
       all_items.get(0,item_id);
       all_items.get(1,guid);
-      if (guids.find(guid.text())==NULL){
+      if (guids.find(guid.text())==-1){
         //fxmessage("item removed from feed\n");
         del_items.set(0,item_id);
         del_items.execute();

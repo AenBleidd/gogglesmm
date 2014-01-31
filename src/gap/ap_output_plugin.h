@@ -19,15 +19,19 @@
 #ifndef OUTPUT_PLUGIN_H
 #define OUTPUT_PLUGIN_H
 
+struct pollfd;
+
 namespace ap {
 
 class GMAPI OutputPlugin {
 public:
-  AudioFormat af;
+  OutputThread* output;
+  AudioFormat   af;
 public:
   /// Constructor
-  OutputPlugin() {}
+  OutputPlugin(OutputThread * o) : output(o) {}
 
+  /// Output Plugin Type
   virtual FXchar type() const=0;
 
   /// Set Device Configuration
@@ -50,11 +54,16 @@ public:
   /// Wait until playback buffer is emtpy.
   virtual void drain()=0;
 
+  virtual void start() {}
+
   /// Pause Playback
   virtual void pause(FXbool t)=0;
 
   /// Change Volume
-  virtual void volume(FXfloat) { }
+  virtual void volume(FXfloat) {}
+
+  /// Get Volume
+  virtual FXfloat volume() {return 1.0f;}
 
   /// Close Output
   virtual void close() {}

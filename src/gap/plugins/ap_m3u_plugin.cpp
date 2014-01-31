@@ -34,7 +34,6 @@
 #include "ap_input_thread.h"
 #include "ap_buffer.h"
 #include "ap_decoder_thread.h"
-#include "ap_output_thread.h"
 
 namespace ap {
 

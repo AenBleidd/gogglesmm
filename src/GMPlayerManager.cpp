@@ -119,6 +119,7 @@ FXDEFMAP(GMPlayerManager) GMPlayerManagerMap[]={
   FXMAPFUNC(SEL_PLAYER_STATE,GMPlayerManager::ID_AUDIO_PLAYER,GMPlayerManager::onPlayerState),
   FXMAPFUNC(SEL_PLAYER_META,GMPlayerManager::ID_AUDIO_PLAYER,GMPlayerManager::onPlayerMeta),
   FXMAPFUNC(SEL_PLAYER_ERROR,GMPlayerManager::ID_AUDIO_PLAYER,GMPlayerManager::onPlayerError),
+  FXMAPFUNC(SEL_PLAYER_VOLUME,GMPlayerManager::ID_AUDIO_PLAYER,GMPlayerManager::onPlayerVolume),
 
   FXMAPFUNC(SEL_COMMAND,GMPlayerManager::ID_CANCEL_TASK,GMPlayerManager::onCancelTask),
 
@@ -1113,9 +1114,9 @@ FXbool GMPlayerManager::init_database(GMTrackDatabase * db){
   return true;
   }
 
-FXbool GMPlayerManager::hasSourceWithKey(const char * key) const{
+FXbool GMPlayerManager::hasSourceWithKey(const FXString & key) const{
   for (FXint i=0;i<sources.no();i++){
-    if (sources[i]->settingKey()==key)
+    if (key==sources[i]->settingKey())
       return true;
     }
   return false;
@@ -1126,8 +1127,8 @@ void GMPlayerManager::cleanSourceSettings() {
   FXint s;
   FXStringList keys;
 
-  for (s=application->reg().first();s<application->reg().size();s=application->reg().next(s)){
-    if (comparecase(application->reg().key(s),"database",8)==0){
+  for (s=0;s<application->reg().no();s++){    
+    if (!application->reg().empty(s) && comparecase(application->reg().key(s),"database",8)==0){
       if (!hasSourceWithKey(application->reg().key(s))) {
         keys.append(application->reg().key(s));
         }
@@ -1135,7 +1136,7 @@ void GMPlayerManager::cleanSourceSettings() {
     }
 
   for (s=0;s<keys.no();s++){
-    application->reg().deleteSection(keys[s].text());
+    application->reg().deleteSection(keys[s]);
     }
   }
 
@@ -1985,6 +1986,13 @@ long GMPlayerManager::onPlayerState(FXObject*,FXSelector,void* ptr){
   if (mpris2) mpris2->notify_status_change();
   if (appstatus) appstatus->notify_status_change();
 #endif
+  return 1;
+  }
+
+long GMPlayerManager::onPlayerVolume(FXObject*,FXSelector,void* ptr){
+  FXfloat value = *(FXfloat*)ptr;
+  GM_DEBUG_PRINT("[player] volume %g\n",value);
+  getMainWindow()->update_volume_display((int)(value*100.0f));
   return 1;
   }
 
