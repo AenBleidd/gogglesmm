@@ -1,7 +1,7 @@
 /*******************************************************************************
 *                         Goggles Music Manager                                *
 ********************************************************************************
-*           Copyright (C) 2007-2010 by Sander Jansen. All Rights Reserved      *
+*           Copyright (C) 2007-2014 by Sander Jansen. All Rights Reserved      *
 *                               ---                                            *
 * This program is free software: you can redistribute it and/or modify         *
 * it under the terms of the GNU General Public License as published by         *
@@ -18,6 +18,7 @@
 ********************************************************************************/
 #include "gmdefs.h"
 #include "gmutils.h"
+#include "GMApp.h"
 #include "GMTrack.h"
 #include "GMAudioScrobbler.h"
 #include "GMAudioPlayer.h"
@@ -48,7 +49,7 @@
 #define CLIENT_KEY "76525254135cc544d13d381514222c56"
 #define CLIENT_SECRET "09397d5d6a55858a6883735b7cb694f7"
 
-#define SCROBBLER_CACHE_FILE PATHSEPSTRING ".goggles" PATHSEPSTRING "scrobbler.cache"
+#define SCROBBLER_CACHE_FILE PATHSEPSTRING "scrobbler.cache"
 
 #define LASTFM_URL "http://ws.audioscrobbler.com:80/2.0/"
 #define LASTFM_OLD_URL "http://post.audioscrobbler.com:80"
@@ -630,7 +631,7 @@ FXbool GMAudioScrobbler::isEnabled(){
 void GMAudioScrobbler::load_queue(){
   FXTRACE((60,"GMAudioScrobbler::load_queue\n"));
   FXuint version,size;
-  FXString filename = FXSystem::getHomeDirectory() + SCROBBLER_CACHE_FILE;
+  FXString filename = GMApp::getCacheDirectory() + SCROBBLER_CACHE_FILE;
   FXFileStream store;
   if (store.open(filename,FXStreamLoad)){
     store >> version;
@@ -650,8 +651,8 @@ void GMAudioScrobbler::load_queue(){
 void GMAudioScrobbler::save_queue(){
   FXTRACE((60,"GMAudioScrobbler::save_queue => %ld entries\n",submitqueue.no()));
   FXuint version=20080501,size;
-  FXString filename = FXSystem::getHomeDirectory() + SCROBBLER_CACHE_FILE;
   if (submitqueue.no()) {
+    FXString filename = GMApp::getCacheDirectory(true) + SCROBBLER_CACHE_FILE;
     FXFileStream store;
     if (store.open(filename,FXStreamSave)){
       store << version;
@@ -662,6 +663,7 @@ void GMAudioScrobbler::save_queue(){
       }
     }
   else {
+    FXString filename = GMApp::getCacheDirectory() + SCROBBLER_CACHE_FILE;
     FXFile::remove(filename);
     }
   }

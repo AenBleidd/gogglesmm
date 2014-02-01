@@ -1,7 +1,7 @@
 /*******************************************************************************
 *                         Goggles Music Manager                                *
 ********************************************************************************
-*           Copyright (C) 2006-2010 by Sander Jansen. All Rights Reserved      *
+*           Copyright (C) 2006-2014 by Sander Jansen. All Rights Reserved      *
 *                               ---                                            *
 * This program is free software: you can redistribute it and/or modify         *
 * it under the terms of the GNU General Public License as published by         *
@@ -57,7 +57,7 @@ static bool gm_display_help(int argc,char * argv[]) {
       return true;
       }
     else if ( (comparecase(argv[i],"--version")==0) || (comparecase(argv[i],"-v")==0) ) {
-      fxmessage("Goggles Music Manager %d.%d.%d\n",APPLICATION_MAJOR,APPLICATION_MINOR,APPLICATION_LEVEL);
+      fxmessage("Goggles Music Manager %s\n",APPLICATION_VERSION_STRING);
       return true;
       }
     }
