@@ -2261,10 +2261,10 @@ long GMHotKeyTextField::onKeyPress(FXObject*,FXSelector,void* ptr){
       table->cancelInput();
       return 1;
       }
-    if ((event->code == KEY_Delete || event->code == KEY_KP_Delete) && !(event->state&SHIFTMASK) && !(event->state&ALTMASK) &&!(event->state&CONTROLMASK)) {
+/*    if ((event->code == KEY_Delete || event->code == KEY_KP_Delete) && !(event->state&SHIFTMASK) && !(event->state&ALTMASK) &&!(event->state&CONTROLMASK)) {
       setText(table->hotkeys->gm_convert_hotkeycode_to_string(0,0));
       return 1;
-      }
+      }*/
     if ((event->code == KEY_Return || event->code == KEY_KP_Enter) && !(event->state&SHIFTMASK) && !(event->state&ALTMASK) &&!(event->state&CONTROLMASK)) {
       table->acceptInput();
       return 1;
